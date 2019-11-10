@@ -1,0 +1,38 @@
+ALTER TABLE conciertos ADD DuracionAproximada varchar2(12);
+
+
+CREATE OR REPLACE PROCEDURE RellenarCDuracion()
+IS
+	CURSOR c_programas IS
+	select *
+	from programas;
+BEGIN
+	FOR pro in c_programas loop
+		sumartiempo(pro.codig_concierto,pro.obras_codigo);
+	END loop;
+END;
+
+
+CREATE OR REPLACE PROCEDURE sumartiempo (p_concierto varchar2 ,p_obra varchar2)
+IS
+	min 	NUMBER;
+	oldmin	NUMBER;
+	segmento NUMBER :=45;
+BEGIN
+	select substr(duracion,1,2) into min
+	from obras 
+	where codigo_obra=p_obra;
+	
+	select duracionaproximada into oldmin
+	from conciertos 
+	where cod_concierto = p_concierto;
+
+	IF oldmin > segmento THEN
+		min:= min + 10;
+		segmento:= segmento + 45;
+	END IF;
+
+	update conciertos
+	set duracionaproximada = duracionaproximada + min
+	where cod_concierto = p_concierto;
+END;

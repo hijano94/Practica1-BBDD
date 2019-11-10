@@ -1,0 +1,26 @@
+CREATE TRIGGER fechaCaballo BEFORE INSERT OR UPDATE
+ON participaciones FOR EACH ROW
+EXECUTE PROCEDURE comprobarFecha();
+
+CREATE OR REPLACE FUNCTION comprobarFecha()
+RETURNS trigger AS
+$BODY$
+DECLARE
+	v_FechaMin	date;
+	v_FechaMax	date;
+	v_FechaCab	date;
+BEGIN
+	select FechaNacMin, FechaNacMax into v_FechaMin, v_FechaMax
+	from carreras
+	where CodCarrera= new.CodCarrera;
+
+	select FechaNac into v_FechaCab
+	from caballos
+	where CodCaballo = new.CodCaballo;
+
+	IF v_FechaCab NOT BETWEEN v_FechaMin AND v_FechaMax THEN
+		RAISE NOTICE 'Caballo fuera del rango de edad';
+	END IF;
+END;
+$BODY$
+LANGUAGE plpgsql;

@@ -1,0 +1,102 @@
+Realiza   los   módulos   de   programación   necesarios   para   evitar
+que   compositores   que   no   viviesen
+simultáneamente aparezcan como coautores de una obra.
+
+
+Create or replace package Pkgcompositor
+as
+	TYPE tfcompositor is RECORD
+	(
+    ID  compositores.ID%type,
+    FechaNacimiento compositores.FechaNacimiento%type,
+    ID_obra obras.codigo_obra%type
+	);
+
+end;
+
+Create or replace package body as
+
+cursor c_compositores is
+select c.ID,c.FechaNacimiento,cp.codigo_obra
+from compositores c
+INNER JOIN compositoresporpiezas cp
+ON compositores.idcompositor = compositoresporpiezas.idcompositor;
+i number:=0;
+
+begin
+for v_compositor in c_compositores loop
+  Pkgcompositor.tfcompositor(i).ID:=v_compositor.ID;
+  Pkgcompositor.tfcompositor(i).FechaNacimiento:=v_compositor.FechaNacimiento;
+  Pkgcompositor.tfcompositor(i).ID_obra:=v_compositor.codigo_obra;
+  i:=i+1;
+end loop;
+end;
+
+
+Create or replace function existeobra(p_cod varchar2)
+return number
+is
+
+    v_obra    obras.codigo_obra%type;
+    existe_obra number:=0;
+
+begin
+
+    select codigo_obra into v_obra
+    from obras
+    where codigo_obra=p_cod;
+    if v_obra is not null then
+        existe_obra:=1;
+    end if;
+    return existe_obra;
+end;
+
+
+Create or replace function ambosvivir(id_autor number,id_obra number)
+return date
+is
+    cursor c_fecha_autor is
+    select min(c.FechaNacimiento)
+    from compositores c
+    INNER JOIN compositoresporpiezas cp
+    ON compositores.idcompositor = compositoresporpiezas.idcompositor
+    where cod_obra=id_obra;
+    year_minimo number;
+    year_nuevoautor number;
+    diferencia_year number;
+    minimo  c_fecha_autor%rowtype;
+    ambos_vivir number:=0;
+
+begin
+
+    open c_fecha_autor;
+    fetch c_fecha_autor into minimo;
+    close c_fecha_autor;
+    year_nuevoautor:=(select to_number(to_char(FechaNacimiento,'YYYY'))
+                      from compositores
+                      where ID=id_autor);
+
+    year_minimo:=to_number(to_char(minimo,'YYYY'));
+
+    diferencia_year:=year_nuevoautor-year_minimo;
+
+    if diferencia_year <= 50 then
+      ambos_vivir:=1;
+    end if;
+    return ambos_vivir;
+end;
+
+
+Create or replace trigger coautores_obra
+before insert on compositoresporpiezas
+for each row
+declare
+	v_existe_obra  number;
+  v_vivir_ambos  number;
+begin
+	v_existe_obra:=existeobra(new.cod_obra);
+  v_vivir_ambos:=ambosvivir(new.idcompositor,new.cod_obra);
+	if existeobra(new.cod_obra)=1 and v_vivir_ambos=0 then
+		raise_application_error(-20100,'no vivien simultaneamente');
+	end if;
+end;

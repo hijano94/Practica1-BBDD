@@ -1,0 +1,268 @@
+
+Realiza un procedimiento que genere varios listados acerca de la programación anual del auditorio gestionando las excepciones que consideres oportunas. El primer parámetro determinará el tipo de informe.
+###################################################################
+
+Informe Tipo 1:
+El segundo parámetro será un código de concierto. Se mostrará el programa del citado concierto manteniendo correctamente el orden de las obras y con la siguiente información:
+
+Código de Concierto: xxxxxxxx
+Fecha: dd/mm/yy
+Título del Concierto: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+	NombreObra1 CompositoresObra1 InterpreteObra1 Duración
+	...
+	NombreObraN CompositoresObra1 InterpreteObra1 Duración
+
+########################################################
+
+CREATE OR REPLACE FUNCTION Informes (p_tipo integer, p_Seg varchar(25))
+returns varchar as $$
+declare
+	v_text  text;
+BEGIN
+	CASE p_tipo
+		WHEN 1 THEN
+			select Informe1(p_Seg) into v_text;
+		WHEN 2 THEN
+			select Informe2(p_Seg) into v_text;
+		WHEN 3 THEN
+			select Informe3(p_Seg) into v_text;
+	END CASE;
+	return v_text;
+END;$$ 
+LANGUAGE plpgsql;
+
+########################################################
+CREATE OR REPLACE FUNCTION Informe1 (p_Cod conciertos.cod_concierto%type)
+returns text as $$
+declare
+	v_programa text;
+	v_obra 		text DEFAULT '';
+	v_comp		text DEFAULT '';
+	v_inte 		text DEFAULT '';
+	v_dura 		text DEFAULT '';
+	reg RECORD;
+	c_obras CURSOR FOR 
+		select *
+		from programas
+		where codconcierto=p_Cod
+		order by Orden;
+BEGIN
+	select cabecera1(p_Cod)::varchar into v_programa;
+	
+	OPEN c_obras;
+	LOOP
+	FETCH c_obras INTO reg;
+	EXIT WHEN NOT FOUND;
+		select nombre_obra(reg.obra_codigo) into v_obra;
+		select nombre_compositor(reg.obra_codigo) into v_comp;
+		select nombre_interprete(reg.obra_codigo, p_Cod)::varchar into v_inte;
+		select duracion_obra(reg.obra_codigo) into v_dura;
+
+		v_programa:= v_programa ||chr(10)||v_obra||chr(9)|| v_comp ||chr(9)|| v_inte||chr(9)||v_dura;
+	END LOOP;
+	CLOSE c_obras;
+	return v_programa;
+END;
+$$ LANGUAGE plpgsql;
+
+########################################################
+
+CREATE OR REPLACE FUNCTION cabecera1 (p_cod conciertos.cod_concierto%type)
+returns text as $$
+declare
+	v_fecha 	conciertos.fechahora%type;
+	v_titulo	conciertos.titulo_concierto%type;
+	cabecera TEXT DEFAULT '';
+BEGIN
+	select fechahora, titulo_concierto into v_fecha, v_titulo
+	from conciertos
+	where cod_concierto=p_cod;
+
+	cabecera := 'Código de Concierto: '|| p_cod ||E'\n'||'Fecha: '|| to_char(v_fecha,'DD/MM/YY') ||chr(10)||'Título del concierto: '||v_titulo||chr(10)||'    Obra        |    Compositor     |     Interprete      |     Duracion';
+
+	return cabecera;
+END;
+$$ LANGUAGE plpgsql;
+
+########################################################
+
+CREATE OR REPLACE FUNCTION duracion_obra (p_obra obras.codigo_obra%type)
+returns varchar as $$
+declare
+	v_durac		TEXT DEFAULT '';
+BEGIN
+	select duracion into v_durac
+	from obras
+	where codigo_obra= p_obra;
+	RETURN v_durac; 
+END;
+$$ LANGUAGE plpgsql;
+
+########################################################
+
+CREATE OR REPLACE FUNCTION nombre_obra (p_obra obras.codigo_obra%type)
+returns varchar as $$
+declare
+	v_nombre	TEXT DEFAULT '';
+BEGIN
+	select nombre_obra into v_nombre
+	from obras
+	where codigo_obra= p_obra;
+	RETURN v_nombre;
+END;
+$$ LANGUAGE plpgsql;
+
+########################################################
+
+CREATE OR REPLACE FUNCTION nombre_compositor (p_obra obras.codigo_obra%type)
+returns text as $$
+declare
+	v_nombre	varchar(50);
+	compositores text default '';
+	v_comp		RECORD;
+	
+	c_compositores CURSOR
+	for select *
+	from compositoresporpiezas
+	where cod_obra=p_obra;
+BEGIN
+	OPEN c_compositores;
+	LOOP
+	FETCH c_compositores INTO v_comp;
+	exit when not found;
+
+	select nombre into v_nombre
+	from compositores
+	where id=v_comp.idcompositor;
+
+	compositores:= compositores || v_nombre || '    ';
+	END LOOP;
+	CLOSE c_compositores;
+	return compositores;
+END;
+$$ LANGUAGE plpgsql;
+
+########################################################
+
+CREATE OR REPLACE FUNCTION nombre_interprete (p_obra obras.codigo_obra%type, p_Cod conciertos.cod_concierto%type)
+returns text as $$
+declare
+	v_nombre 	interpretes.nombre_interprete%type;
+	v_interpretes TEXT default '';
+	v_id RECORD;
+
+	c_interpretes CURSOR
+	for select *
+	from interpretesporpiezas
+	where cod_obra = p_obra AND cod_concierto = p_Cod;
+BEGIN
+	OPEN c_interpretes;
+	LOOP
+	FETCH c_interpretes INTO v_id;
+	EXIT when not found;
+	select nombre_interprete into v_nombre
+	from interpretes
+	where id_interprete = v_id.interprete_id;
+
+	v_interpretes:= v_interpretes || v_nombre || '    ';
+	END LOOP;
+	CLOSE c_interpretes;
+	RETURN v_interpretes;
+END;
+$$ LANGUAGE plpgsql;
+
+###################################################################
+Informe Tipo 2:
+El segundo parámetro será un nombre de temporada. Para todos los conciertos de la temporada especificada, se mostrará el programa de la misma forma que en el Informe Tipo1, añadiendo al final una línea con el número de obras representadas durante la temporada.
+
+
+CREATE OR REPLACE FUNCTION Informe2 (p_temp conciertos.temporada%type)
+returns text as $$
+declare
+	v_conc RECORD;
+	v_inf  text DEFAULT '';
+	v_reg  text DEFAULT '';
+	v_size integer := 0;
+
+	c_conciertos CURSOR
+	for select *
+	from conciertos
+	where temporada=p_temp;
+BEGIN	
+	OPEN c_conciertos;
+	LOOP
+
+	FETCH c_conciertos INTO v_conc;
+	EXIT when not found;
+	--RAISE NOTICE '%',v_conc.cod_concierto;
+	select Informe1(v_conc.cod_concierto) into v_reg;
+	select suma_obras(v_size,v_conc.cod_concierto) into v_size;
+	v_inf:= v_inf ||chr(10)||chr(10)||v_reg;
+	END LOOP;
+	v_inf:= v_inf ||chr(10)||'Numero Total de Obras: '||v_size;
+	CLOSE c_conciertos;
+
+	return v_inf;
+END;
+$$ LANGUAGE plpgsql;
+
+########################################################
+
+CREATE OR REPLACE FUNCTION suma_obras(p_num INTEGER, p_cod varchar(50))
+returns integer as $$
+BEGIN
+	p_num:= p_num + (select count(*) from programas where codconcierto= p_cod);
+	return p_num;
+END;
+$$ LANGUAGE plpgsql;
+
+####################################################################
+Informe Tipo 3:
+El segundo parámetro será un código de ciclo. Para todos los conciertos del ciclo especificado, se mostrará el programa de la misma forma que en el Informe Tipo1, añadiendo al final una línea con el número de compositores diferentes incluídos en el ciclo.
+
+########################################################
+
+CREATE OR REPLACE FUNCTION Informe3 (p_ciclo conciertos.codigo_ciclo%type)
+returns text as $$
+declare
+	v_conc RECORD;
+	v_num integer;
+	v_inf text default '';
+	v_reg text default '';
+
+	c_conciertos CURSOR
+	for select *
+	from conciertos
+	where codigo_ciclo=p_ciclo;
+BEGIN	
+	OPEN c_conciertos;
+	LOOP
+
+	FETCH c_conciertos INTO v_conc;
+	EXIT when not found;
+	select Informe1(v_conc.cod_concierto) into v_reg;
+	v_inf:= v_inf || chr(10)||chr(10)||v_reg;
+	END LOOP;
+	CLOSE c_conciertos;
+	select num_comp(p_ciclo) into v_num;
+	v_inf:= v_inf ||chr(10)||chr(10)||'Numero de compositores: '||v_num;
+	return v_inf;
+END;
+$$ LANGUAGE plpgsql;
+
+########################################################
+
+CREATE OR REPLACE FUNCTION num_comp(p_cod varchar)
+returns text as $$
+declare
+ v_num INTEGER;
+BEGIN
+	select count(distinct c.idcompositor) into v_num
+	from compositoresporpiezas c
+	JOIN programas p ON c.cod_obra = p.obra_codigo
+	JOIN conciertos con ON p.codconcierto = con.cod_concierto 
+	and con.codigo_ciclo= p_cod;
+	return v_num;
+END;
+$$ LANGUAGE plpgsql;

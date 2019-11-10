@@ -1,0 +1,79 @@
+3. Realiza un trigger que impida que una obra de duración superior a los quince minutos sea considerada
+de fácil escucha si ha participado algún compositor cuyo nacimiento se produjera en el siglo XX.
+
+
+
+
+create or replace function compositoresxx(p_id compositores.id%type)
+returns varchar as $$
+declare
+	ind_sigloxx 		integer;
+	v_fechanacimiento	compositores.fechanacimiento%type;
+	v_id	compositores.id%type;
+begin
+	select fechanacimiento into v_fechanacimiento
+	from compositores
+	where id = p_id;
+	if to_char(v_fechanacimiento,'YYYY')between '1900' and '1999' then
+	 ind_sigloxx:=1;
+	end if;
+	return ind_sigloxx;
+end;
+$$ LANGUAGE plpgsql;
+
+
+
+
+create or replace function duracion15(p_codigo_obra obras.codigo_obra%type)
+returns varchar as $$
+declare
+	ind_mas15 		integer;
+	v_duracion	obras.duracion%type;
+begin
+	select duracion into v_duracion
+	from obras
+	where codigo_obra=p_codigo_obra;
+		if substr(v_duracion,1,2) > '15' then
+			ind_mas15:=1;
+		end if;
+	return ind_mas15;
+end;
+$$ LANGUAGE plpgsql;
+
+create or replace function sifacil(p_codigo_obra obras.codigo_obra%type)
+returns varchar as $$
+declare
+	ind_facil 		integer;
+	v_facil_escucha	obras.facil_escucha%type;
+begin
+	select facil_escucha into v_facil_escucha
+	from obras
+	where codigo_obra=p_codigo_obra;
+	if v_facil_escucha='si' then
+	ind_facil:=1;
+	end if;
+	return ind_facil;
+end;
+$$ LANGUAGE plpgsql;
+
+
+create  trigger facil_esc
+before insert on compositoresporpiezas
+for each row
+execute procedure sifacil();
+
+create or replace function sifacil() returns trigger as $$
+declare
+	ind_sigloxx 		integer;
+	ind_mas15 		integer;
+	ind_facil 		integer;
+	v_id_compositor	compositoresporpiezas.idcompositor%type;
+	v_cod_obra	compositoresporpiezas.cod_obra%type;
+begin
+	ind_sigloxx:=compositoresxx(new.idcompositor);
+	ind_mas15:=duracion15(new.cod_obra);
+	ind_facil:=sifacil(new.cod_obra);
+	if ind_sigloxx=1 and ind_mas15=1 and ind_facil=1 then
+		raise notice'No puede ser facil escucha dura mas de 15 minutos';
+	end if;
+end 

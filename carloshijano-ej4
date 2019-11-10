@@ -1,0 +1,63 @@
+1. apt install postgresql-plpython3
+2. git clone https://github.com/lcalisto/py_pgmail.git
+3. create extension plpython3u;
+3. Compilo en postgres la funcion py_pgmail/py_pgmail.sql
+
+
+update conciertos set temporada = 'primavera' where cod_concierto= 'b984';
+
+
+CREATE TRIGGER fechaTemporada BEFORE INSERT OR UPDATE
+ON conciertos FOR EACH ROW
+EXECUTE PROCEDURE comprobarFecha();
+
+CREATE OR REPLACE FUNCTION comprobarFecha()
+RETURNS trigger AS
+$BODY$
+declare
+	v_ini 	DATE;
+	v_fin 	DATE;
+BEGIN
+  select fecha_inicio, fecha_fin INTO v_ini, v_fin
+  from temporadas
+  where nombre_temporada= New.Temporada;
+
+  IF NEW.fechahora NOT BETWEEN v_ini AND v_fin THEN
+  
+  	select enviarCorreo();
+
+  END IF;
+  return 0;
+END;
+$BODY$
+LANGUAGE plpgsql;
+
+################################################################
+
+CREATE OR REPLACE FUNCTION enviarCorreo ()
+RETURNS text AS
+$BODY$
+BEGIN
+
+	select py_pgmail
+	(
+	'bbddcarlosiesgn@gmail.com',
+	array['carloshijano94@gmail.com'],
+	array[''],
+	array[''],
+	'Error al Insertar Concierto',
+	'bbddcarlosiesgn@gmail.com',
+	'pruebabasedatos',
+	'El concierto está fuera de la temporada',
+	'<!DOCTYPE html>
+		<html>
+		<body>
+		<p>Error en la base de datos al insertar un registro</p>
+		</body>
+		</html>',
+	'smtp.gmail.com:587'
+	);
+
+END;
+$BODY$
+LANGUAGE plpgsql;

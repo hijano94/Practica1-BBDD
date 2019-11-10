@@ -1,0 +1,75 @@
+################################################################
+Realiza todos los modulos de programación y cambios necesarios para evitar que un mismo intrerprete actue más de una vez por concierto.
+###############################################################
+
+CREATE OR REPLACE PACKAGE PkgCtrlinter
+as
+	TYPE tRegContadores IS RECORD 
+	(
+		concierto 		varchar(6),
+		interprete 		varchar(10)
+	);
+
+	TYPE tTablaContadores IS table of tRegContadores
+	INDEX BY BINARY_INTEGER;
+
+	vTabla tTablaContadores;
+end;
+################################################################
+CREATE OR REPLACE PROCEDURE RellenarCtrlinter
+IS
+	CURSOR c_inter IS
+	select COD_obra, interprete_id
+	from interpretesporpiezas;
+BEGIN
+	FOR inter in c_inter loop
+		IF NumDeActuaciones(inter.COD_obra, inter.interprete_id) = 0 THEN
+			SumarInterprete(inter.COD_obra, inter.interprete_id);
+		ELSE
+			RAISE_APPLICATION_ERROR(-20140,'No se puede inscribir más de un interprete en la misma función.');
+		END IF;
+	END loop;
+END;
+#################################################################
+CREATE OR REPLACE FUNCTION NumDeActuaciones(p_con varchar2, p_int varchar2)
+RETURN NUMBER
+IS
+	v_num 	NUMBER;
+BEGIN
+
+	IF PkgCtrlinter.vTabla.COUNT > 0 THEN
+		FOR i IN PkgCtrlinter.vTabla.FIRST..PkgCtrlinter.vTabla.LAST loop
+
+			IF PkgCtrlinter.vTabla(i).concierto = p_con AND PkgCtrlinter.vTabla(i).interprete = p_int THEN
+				raise_application_error(-20010, 'No se puede inscribir el interprete');
+			END IF;
+		END LOOP;
+	END IF;
+	return 0;
+END;
+##################################################################
+CREATE OR REPLACE PROCEDURE SumarInterprete (p_con varchar2, p_int varchar2)
+IS
+	Indice NUMBER;
+BEGIN
+	IF PkgCtrlinter.vTabla.COUNT = 0 THEN
+		Indice := 0;
+	ELSE
+		Indice := PkgCtrlinter.vTabla.LAST + 1;
+	END if;
+
+	PkgCtrlinter.vTabla(Indice).concierto := p_con;
+	PkgCtrlinter.vTabla(Indice).interprete := p_int;
+END;
+#################################################################
+CREATE OR REPLACE TRIGGER MaxInterpretes
+before insert or update on interpretesporpiezas
+for each row
+declare
+BEGIN
+	IF NumDeActuaciones(:new.COD_obra, :new.interprete_id) = 0 THEN
+		SumarInterprete(:new.COD_obra, :new.interprete_id);
+	ELSE
+		RAISE_APPLICATION_ERROR(-20150,'No se puede inscribir más de un interprete en la misma función');
+	END IF;
+END;
