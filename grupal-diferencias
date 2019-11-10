@@ -1,0 +1,105 @@
+Diferencias entre PL/SQL y PL/PGSQL
+
+Lo primera fdiferencia es en quien lo creó, PL/SQL fue patentado por Oracle, mientras que PL/PGSQL fue por PostgreSQL, despues PL/SQL es universal(con minimas modificaciones) por lo tanto es mas utilizado, mientras que PL/PGSQL al ser solo usado por PostgreSQL se utiliza menos.
+
+Una vez hablado sobre la teoria, ahora vamos a ver las diferencias tecnicas entre ellas.
+
+Cuando hablamos de "pl/sql o pl/pgsql" pensamos en programacion, una de las cosas que mas se usan son las funciones, aqui encontramos las siguientes diferencias:
+
+en oracle se crea asi:
+
+Create or replace function nombrefuncion(argumento,..)
+return tipodedato
+is
+    variables a declarar
+begin
+    codigo
+end;
+
+mientras que en PostgreSQL es asi;
+
+Create or replace function nombrefuncion(argumento,..)
+returns tipodedato as $$
+declare
+    variables a declarar
+begin
+  	codigo
+end;
+$$ LANGUAGE plpgsql;
+
+Las diferencias son que PL/PGSQL cambia "is" por "AS $$" y añade la linea "declare" para diferenciar la seccion de declaracion sin contar con que PL/PGSQL acaba por "$$ LANGUAGE plpgsql;"
+
+Lo mismo pasa al crear un procedimiento
+
+PL/SQL
+
+Create or replace procedure nombrefuncion(argumento,..)
+is
+    variables a declarar
+begin
+    codigo
+end;
+
+
+PL/PGSQL
+
+Create or replace procedure nombrefuncion(argumento,..) as $$
+declare
+    variables a declarar
+begin
+  	codigo
+end;
+$$ LANGUAGE plpgsql;
+
+La forma de abrir y declarar los cursores tambien cambian:
+
+declarar cursores
+
+PL/SQL
+
+CURSOR c_compositores IS argumentos;
+
+PL/PGSQL
+
+nombrecursor CURSOR FOR argumentos;
+
+
+abrir cursores
+
+
+PL/SQL
+
+open nombrecursor;
+
+PL/PGSQL
+
+OPEN nombrecursor FOR consulta;
+
+
+A la hora de crear un tigger en PL/PGSQL tenemos que separar el trigger de la ejecucion del mismo, mientras que en oracle no es necesario separar el procedimiento del trigger
+
+PL/SQL
+
+CREATE OR REPLACE TRIGGER nombretrigger
+(AFTER/BEFORE) (INSERT,UPDATE OR DELETE) ON tabla
+FOR EACH (fila o sentencia)
+BEGIN
+    procedimiento/ejecucion
+END;
+
+PL/PGSQL
+
+
+CREATE OR REPLACE FUNCTION nombrefuncion RETURNS TRIGGER AS $nombretrigger$
+DECLARE
+    ...
+BEGIN
+    ...
+END;
+$nombretrigger$ LANGUAGE PLPGSQL
+
+
+CREATE OR REPLACE nombretrigger
+(AFTER OR BEFORE)(INSERT,UPDATE OR DELETE) ON tabla
+FOR EACH(FILA O SENTENCIA)
+EXECUTE FUNCTION nombrefuncion;

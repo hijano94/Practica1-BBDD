@@ -1,0 +1,68 @@
+
+7.Realiza los módulos de programación necesarios para garantizar que un empleado no
+tiene asignados turnos en dos zonas distintas simultáneamente, es decir, que no se
+solapan los turnos asignados a un mismo empleado.
+
+
+
+
+
+create or replace package ej7
+is
+	TYPE tRegistro IS RECORD
+	( 
+		dniempleado				empleados.dni%type,
+		fechainicio	date,
+		fechafin		date
+	);
+	
+	TYPE tTabla IS TABLE OF tRegistro
+	INDEX By BINARY_INTEGER; 
+	
+	v_turnosporzona tTabla;
+end ej7;
+/
+
+
+create or replace trigger insertartablaturnos
+before insert or update on turnosporzona
+declare
+	cursor c_turno
+	is
+	select dniempleado,cod_zona,fechainicio,fechafin 
+	from turnosporzona;
+
+	i number:=0;
+begin
+	ej7.v_turnosporzona.DELETE;
+
+	for v_turnosporzona in c_turno loop
+		ej7.v_turnosporzona(i).dniempleado:=v_turnosporzona.dniempleado;
+		ej7.v_turnosporzona(i).fechainicio:=v_turnosporzona.fechainicio;
+		ej7.v_turnosporzona(i).fechafin:=v_turnosporzona.fechafin;
+		i:=i+1;
+	end loop;
+end;
+/
+
+
+
+create or replace trigger controlarturnos
+before insert or update on turnosporzona
+for each row
+declare
+	i NUMBER;
+begin
+	for i in ej7.v_turnosporzona.FIRST..ej7.v_turnosporzona.LAST loop
+		if ej7.v_turnosporzona(i).dniempleado = :new.dniempleado then
+			if :new.fechainicio >= ej7.v_turnosporzona(i).fechainicio and :new.fechainicio <= ej7.v_turnosporzona(i).fechafin  then 
+				raise_application_error(-20012,'Fecha de inicio no valida, el empleado no puede trabajar en dos zonas a la vez');
+			end if;
+			if :new.fechafin <= ej7.v_turnosporzona(i).fechafin and :new.fechafin >= ej7.v_turnosporzona(i).fechainicio then
+				raise_application_error(-20013,'Fecha fin no valida, el empleado no puede trabajar en dos zonas a la vez');
+			end if;
+		end if;
+	end loop;
+end;
+/
+

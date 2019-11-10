@@ -1,0 +1,423 @@
+2. Realiza un procedimiento que sea capaz de realizar informes sobre los riegos realizados y las
+condiciones de cada zona del vivero. El primer parámetro será el tipo de informe que deseamos, el
+segundo será el nombre del mes y el tercero el año del que queremos esa información. El significado
+del resto de los parámetros cambiará según el tipo de informe deseado. Controla las excepciones que
+consideres oportunas. Los informes a realizar serán los siguientes:
+
+Informe Tipo 1: El cuarto parámetro será el código de un vivero y el quinto el de una zona. El informe
+nos mostrará todos los riegos realizados en esa zona en el mes y año indicados.
+
+create or replace function cabecera1(p_cod_vivero riegosporzona.cod_vivero%type,p_cod_zona riegosporzona.cod_zona%type,p_mes varchar,p_anyo varchar)returns text as $$
+declare
+	v_mes	riegosporzona.fechamashora%type;
+	v_nombre_zona	zonas.nombre%type;
+	v_anyo	riegosporzona.fechamashora%type;
+	cabecera TEXT DEFAULT '';
+begin
+	select fechamashora into v_mes
+	from riegosporzona 
+	where cod_vivero = p_cod_vivero
+	and to_char(fechamashora,'MM')=p_mes;
+
+	select nombre into v_nombre_zona
+	from zonas 
+	where codigo = p_cod_zona;
+
+	select fechamashora into v_anyo
+	from riegosporzona 
+	where cod_vivero = p_cod_vivero
+	and to_char(fechamashora,'YYYY')=p_anyo;
+
+	cabecera := 'Código de Vivero: '|| p_cod_vivero ||E'\n'||'Mes: '|| to_char(v_mes,'MM') ||chr(10)||'Año: '||to_char(v_anyo,'YYYY')||chr(10)||'Nombre zona: '|| v_nombre_zona ||E'\n'||'    Dia  Riego     |     Hora_Riego      |	cantidad	|     Duracion_Riego	| Humedad_Previa	| Humedad_Posterior'||E'\n';
+	return cabecera;
+end;
+$$ LANGUAGE plpgsql;
+
+create or replace function dia_riego (p_cod_vivero riegosporzona.cod_vivero%type, p_codigo_zona riegosporzona.cod_zona%type,p_mes varchar,p_anyo varchar)returns text as $$
+declare
+	v_diahora	TEXT DEFAULT '';
+	v_dias	varchar(20);
+	v_fechas2 RECORD;
+
+	c_dias CURSOR
+	for select *
+	from riegosporzona
+	where cod_vivero = p_cod_vivero 
+	AND cod_zona = p_codigo_zona
+	and to_char(fechamashora,'MM')=p_mes
+	and to_char(fechamashora,'YYYY')=p_anyo;
+BEGIN
+	OPEN c_dias;
+	LOOP
+	FETCH c_dias INTO v_fechas2;
+	EXIT when not found;
+	select  to_char(fechamashora,'DD HH24:MI:SS') into v_dias
+	from riegosporzona
+	where fechamashora = v_fechas2.fechamashora;
+	
+
+
+	v_diahora:= v_diahora || v_dias  ||'	';
+	END LOOP;
+	CLOSE c_dias;
+	RETURN v_diahora;
+END;
+$$ LANGUAGE plpgsql;
+
+
+
+CREATE OR REPLACE FUNCTION cantidad_riego (p_codigo riegosporzona.cod_vivero%type,p_codigo_zona riegosporzona.cod_zona%type,p_mes varchar,p_anyo varchar)
+returns text as $$
+declare
+	v_cantidadriego	TEXT DEFAULT '';
+	v_cantidad	riegosporzona.cantidad%type;
+	v_codigo RECORD;
+
+	c_riegos CURSOR
+	for select *
+	from riegosporzona
+	where cod_vivero = p_codigo 
+	AND cod_zona = p_codigo_zona
+	and to_char(fechamashora,'MM')=p_mes
+	and to_char(fechamashora,'YYYY')=p_anyo;
+BEGIN
+	OPEN c_riegos;
+	LOOP
+	FETCH c_riegos INTO v_codigo;
+	EXIT when not found;
+	select cantidad into v_cantidad
+	from riegosporzona
+	where cantidad=v_codigo.cantidad;
+
+	v_cantidadriego:= v_cantidadriego || v_cantidad ||'	';
+	END LOOP;
+	CLOSE c_riegos;
+	RETURN v_cantidadriego;
+END;
+$$ LANGUAGE plpgsql;
+
+
+
+
+CREATE OR REPLACE FUNCTION duracion_riego (p_codigo riegosporzona.cod_vivero%type, p_codigo_zona riegosporzona.cod_zona%type,p_mes varchar,p_anyo varchar)
+returns text as $$
+declare
+	v_duracionriego	TEXT DEFAULT '';
+	v_duracion	riegosporzona.duracion%type;
+	v_codigo2 RECORD;
+
+	c_duracion CURSOR
+	for select *
+	from riegosporzona
+	where cod_vivero = p_codigo 
+	AND cod_zona = p_codigo_zona
+	and to_char(fechamashora,'MM')=p_mes
+	and to_char(fechamashora,'YYYY')=p_anyo;
+BEGIN
+	OPEN c_duracion;
+	LOOP
+	FETCH c_duracion INTO v_codigo2;
+	EXIT when not found;
+	select duracion into v_duracion
+	from riegosporzona
+	where duracion=v_codigo2.duracion;
+
+	v_duracionriego:= v_duracionriego || v_duracion ||'	';
+	END LOOP;
+	CLOSE c_duracion;
+	RETURN v_duracionriego;
+END;
+$$ LANGUAGE plpgsql;
+
+
+create or replace function humedadprevia (p_cod_vivero riegosporzona.cod_vivero%type, p_codigo_zona riegosporzona.cod_zona%type,p_mes varchar,p_anyo varchar,p_dia varchar)returns text as $$
+declare
+	v_datoshumedad2	TEXT DEFAULT '';
+	v_humedad2	datos.humedad%type;
+	v_fechas4 RECORD;
+
+	c_humed2 CURSOR
+	for select *
+	from datos
+	where cod_vivero = p_cod_vivero 
+	AND cod_zona = p_codigo_zona
+	and to_char(fechamashora,'MM')=p_mes
+	and to_char(fechamashora,'YYYY')=p_anyo
+	and to_char(fechamashora,'DD')=p_dia;
+BEGIN
+	OPEN c_humed2;
+	LOOP
+	FETCH c_humed2 INTO v_fechas4;
+	EXIT when not found;
+	select  humedad into v_humedad2
+	from datos
+	where humedad = v_fechas4.humedad
+	and to_char(fechamashora,'DD') = p_dia - interval'1 day';
+
+
+	v_datoshumedad2:= v_datoshumedad2 || v_humedad2  ||'	' ;
+	END LOOP;
+	CLOSE c_humed2;
+	RETURN v_datoshumedad2;
+END;
+$$ LANGUAGE plpgsql;
+
+create or replace function humedad (p_cod_vivero riegosporzona.cod_vivero%type, p_codigo_zona riegosporzona.cod_zona%type,p_mes varchar,p_anyo varchar)returns text as $$
+declare
+	v_datoshumedad	TEXT DEFAULT '';
+	v_humedad	datos.humedad%type;
+	v_fechas3 RECORD;
+
+	c_humed CURSOR
+	for select *
+	from datos
+	where cod_vivero = p_cod_vivero 
+	AND cod_zona = p_codigo_zona
+	and to_char(fechamashora,'MM')=p_mes
+	and to_char(fechamashora,'YYYY')=p_anyo;
+BEGIN
+	OPEN c_humed;
+	LOOP
+	FETCH c_humed INTO v_fechas3;
+	EXIT when not found;
+	select  humedad into v_humedad
+	from datos
+	where humedad = v_fechas3.humedad;
+
+
+	v_datoshumedad:= v_datoshumedad || v_humedad  ||'	' ;
+	END LOOP;
+	CLOSE c_humed;
+	RETURN v_datoshumedad;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION Informe1 (p_cod_vivero riegosporzona.cod_vivero%type,p_cod_zona riegosporzona.cod_zona%type,p_mes varchar,p_anyo varchar)
+returns text as $$
+declare
+	v_programa text;
+
+	v_dia 		text DEFAULT '';
+	v_litros		text DEFAULT '';
+	v_cant 		text DEFAULT '';
+	v_dura 		text DEFAULT '';
+	v_humed 		text DEFAULT '';
+	v_humpost 		text DEFAULT '';
+	v_humed2	text DEFAULT '';
+	
+	reg RECORD;
+	c_riegos2 CURSOR FOR 
+		select *
+		from riegosporzona
+		where cod_vivero = p_cod_vivero
+		and cod_zona = p_cod_zona
+		and to_char(fechamashora,'MM')=p_mes
+		and to_char(fechamashora,'YYYY')=p_anyo;
+BEGIN
+	select cabecera1(p_cod_vivero,p_cod_zona,p_mes,p_anyo)::varchar into v_programa;
+	OPEN c_riegos2;
+	LOOP
+	FETCH c_riegos2 INTO reg;
+	EXIT WHEN NOT FOUND;
+		select cabecera1(p_cod_vivero,p_cod_zona,p_mes,p_anyo)::varchar into v_programa;
+		select dia_riego(reg.cod_vivero,reg.cod_zona,p_mes,p_anyo)::varchar into v_dia;
+		select cantidad_riego(reg.cod_vivero,reg.cod_zona,p_mes,p_anyo)::varchar into v_cant;
+		select duracion_riego(reg.cod_vivero,reg.cod_zona,p_mes,p_anyo)::varchar into v_dura;
+		select humedadprevia(reg.cod_vivero,reg.cod_zona,p_mes,p_anyo,p_dia )::varchar into v_humed2;
+		select humedad(reg.cod_vivero,reg.cod_zona,p_mes,p_anyo)::varchar into v_humed;
+		select totallitros(reg.cod_vivero,reg.cod_zona,p_mes,p_anyo)::varchar into v_litros;
+		
+
+
+		v_programa:= v_programa ||v_dia|| v_cant || v_dura||v_humed||v_humed2||E'\n'||'Total litros:'||v_litros ;
+	END LOOP;
+	CLOSE c_riegos2;
+	return v_programa;
+END;
+$$ LANGUAGE plpgsql;
+
+create or replace function totallitros (p_cod_vivero riegosporzona.cod_vivero%type,p_cod_zona riegosporzona.cod_zona%type,p_mes varchar,p_anyo varchar)returns text as $$
+declare
+	v_litros	TEXT DEFAULT '';
+begin
+	select sum(cantidad) into v_litros
+	from riegosporzona
+	where cod_vivero = p_cod_vivero
+	and to_char(fechamashora,'MM')=p_mes
+	and to_char(fechamashora,'YYYY')=p_anyo;
+	return v_litros;
+end;
+$$ LANGUAGE plpgsql;
+
+Informe Tipo 2: El cuarto parámetro será el código de un vivero. El quinto estará en blanco. El informe
+nos mostrará todos los riegos realizados en el vivero en el mes y año señalados.
+
+
+create or replace function nombre(p_cod_vivero zonas.cod_vivero%type,p_cod_zona zonas.codigo%type)returns text as $$
+declare
+
+	v_nombre_zona	zonas.nombre%type;
+
+	nombrezona TEXT DEFAULT '';
+begin
+	select nombre into v_nombre_zona
+	from zonas 
+	where codigo = p_cod_zona
+	and cod_vivero = p_cod_vivero;
+	return v_nombre_zona;
+END;
+$$ LANGUAGE plpgsql;
+
+create or replace function litrosvivero(p_cod_vivero riegosporzona.cod_vivero%type,p_mes varchar,p_anyo varchar)returns text as $$
+declare
+
+	v_cantidad2	riegosporzona.cantidad%type;
+
+	litrosviveros TEXT DEFAULT '';
+begin
+	select sum(cantidad) into v_cantidad2
+	from riegosporzona 
+	where cod_vivero = p_cod_vivero
+	and to_char(fechamashora,'MM')=p_mes
+	and to_char(fechamashora,'YYYY')=p_anyo;
+	return v_cantidad2;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION Informe2 (p_cod_vivero riegosporzona.cod_vivero%type,p_cod_zona riegosporzona.cod_zona%type,p_mes varchar,p_anyo varchar)
+returns text as $$
+declare
+	v_programa text;
+
+	v_dia 		text DEFAULT '';
+	v_litros		text DEFAULT '';
+	v_cant 		text DEFAULT '';
+	v_dura 		text DEFAULT '';
+	v_humed 		text DEFAULT '';
+	v_humpost 		text DEFAULT '';
+	v_nombre 		text DEFAULT '';
+	v_litrosviver 		text DEFAULT '';
+	v_humed2	text DEFAULT '';
+	reg RECORD;
+	c_riegos2 CURSOR FOR 
+		select *
+		from riegosporzona
+		where cod_vivero = p_cod_vivero
+		and cod_zona = p_cod_zona
+		and to_char(fechamashora,'MM')=p_mes
+		and to_char(fechamashora,'YYYY')=p_anyo;
+BEGIN
+	select cabecera1(p_cod_vivero,p_cod_zona,p_mes,p_anyo)::varchar into v_programa;
+	OPEN c_riegos2;
+	LOOP
+	FETCH c_riegos2 INTO reg;
+	EXIT WHEN NOT FOUND;
+		select cabecera1(p_cod_vivero,p_cod_zona,p_mes,p_anyo)::varchar into v_programa;
+		select dia_riego(reg.cod_vivero,reg.cod_zona,p_mes,p_anyo)::varchar into v_dia;
+		select cantidad_riego(reg.cod_vivero,reg.cod_zona,p_mes,p_anyo)::varchar into v_cant;
+		select duracion_riego(reg.cod_vivero,reg.cod_zona,p_mes,p_anyo)::varchar into v_dura;
+		select humedadprevia(reg.cod_vivero,reg.cod_zona,p_mes,p_anyo,p_dia )::varchar into v_humed2;
+		select humedad(reg.cod_vivero,reg.cod_zona,p_mes,p_anyo)::varchar into v_humed;
+		select totallitros(reg.cod_vivero,reg.cod_zona,p_mes,p_anyo)::varchar into v_litros;
+		select nombre(reg.cod_vivero,reg.cod_zona)::varchar into v_nombre;
+		select litrosvivero(reg.cod_vivero,p_mes,p_anyo)::varchar into v_litrosviver;
+
+
+
+		v_programa:= v_programa ||v_dia|| v_cant || v_dura||v_humed||v_humed2||E'\n'||'Total litros:'||v_litros||E'\n'||'Nombre Zona:'||v_nombre||E'\n'||'Numero Litros Totales Viveros:'||v_litrosviver;
+	END LOOP;
+	CLOSE c_riegos2;
+	return v_programa;
+END;
+$$ LANGUAGE plpgsql;
+
+
+Informe Tipo 3: El cuarto y quinto parámetro estarán en blanco. El informe nos mostrará todos los riegos
+realizados en todos los viveros en el mes y año señalados.
+
+
+
+
+CREATE OR REPLACE FUNCTION Informe3 (p_cod_vivero riegosporzona.cod_vivero%type,p_cod_zona riegosporzona.cod_zona%type,p_mes varchar,p_anyo varchar)
+returns text as $$
+declare
+	v_programa text;
+
+	v_dia 		text DEFAULT '';
+	v_litros		text DEFAULT '';
+	v_cant 		text DEFAULT '';
+	v_dura 		text DEFAULT '';
+	v_humed 		text DEFAULT '';
+	v_humpost 		text DEFAULT '';
+	v_nombre 		text DEFAULT '';
+	v_litrosviver 		text DEFAULT '';
+	v_litrosmes 		text DEFAULT '';
+	v_codigovivero 		text DEFAULT '';
+	v_humed2	text DEFAULT;
+	reg RECORD;
+	c_riegos2 CURSOR FOR 
+		select *
+		from riegosporzona
+		where cod_vivero = p_cod_vivero
+		and cod_zona = p_cod_zona
+		and to_char(fechamashora,'MM')=p_mes
+		and to_char(fechamashora,'YYYY')=p_anyo;
+BEGIN
+	select cabecera1(p_cod_vivero,p_cod_zona,p_mes,p_anyo)::varchar into v_programa;
+	OPEN c_riegos2;
+	LOOP
+	FETCH c_riegos2 INTO reg;
+	EXIT WHEN NOT FOUND;
+		select cabecera1(p_cod_vivero,p_cod_zona,p_mes,p_anyo)::varchar into v_programa;
+		select dia_riego(reg.cod_vivero,reg.cod_zona,p_mes,p_anyo)::varchar into v_dia;
+		select cantidad_riego(reg.cod_vivero,reg.cod_zona,p_mes,p_anyo)::varchar into v_cant;
+		select duracion_riego(reg.cod_vivero,reg.cod_zona,p_mes,p_anyo)::varchar into v_dura;
+		select humedadprevia(reg.cod_vivero,reg.cod_zona,p_mes,p_anyo,p_dia )::varchar into v_humed2;
+		select humedad(reg.cod_vivero,reg.cod_zona,p_mes,p_anyo)::varchar into v_humed;
+		select totallitros(reg.cod_vivero,reg.cod_zona,p_mes,p_anyo)::varchar into v_litros;
+		select nombre(reg.cod_vivero,reg.cod_zona)::varchar into v_nombre;
+		select litrosvivero(reg.cod_vivero,p_mes,p_anyo)::varchar into v_litrosviver;
+		select codvivero(reg.cod_vivero) into v_codigovivero;
+		select litrostotalmes(p_mes,p_anyo)::varchar into v_litrosmes;
+
+
+		v_programa:= v_programa ||v_dia|| v_cant || v_dura||v_humed||v_humed2||E'\n'||'Total litros:'||v_litros||E'\n'||'Nombre Zona:'||v_nombre||E'\n'||'Numero Litros Totales Viveros:'||v_litrosviver||E'\n'||'Codigo Vivero:'||v_codigovivero||E'\n'||'Numeros litros Totales:'||v_litrosmes ;
+	END LOOP;
+	CLOSE c_riegos2;
+	return v_programa;
+END;
+$$ LANGUAGE plpgsql;
+
+
+create or replace function litrostotalmes(p_mes varchar,p_anyo varchar)returns text as $$
+declare
+
+	v_cantidad3	riegosporzona.cantidad%type;
+
+	litrosviveros TEXT DEFAULT '';
+begin
+	select sum(cantidad) into v_cantidad3
+	from riegosporzona o
+	where to_char(fechamashora,'MM')=p_mes
+	and to_char(fechamashora,'YYYY')=p_anyo;
+	return v_cantidad3;
+END;
+$$ LANGUAGE plpgsql;
+
+create or replace function codvivero(p_cod_vivero zonas.cod_vivero%type)returns text as $$
+declare
+
+	v_codvivero	riegosporzona.cod_vivero%type;
+
+	nombrezona TEXT DEFAULT '';
+begin
+	select cod_vivero into v_codvivero
+	from riegosporzona 
+	where cod_vivero = p_cod_vivero;
+	return v_codvivero;
+END;
+$$ LANGUAGE plpgsql;
+
+
